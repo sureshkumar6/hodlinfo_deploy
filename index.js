@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 import mongoose from 'mongoose'
 import Ticker from "./models/ticker.js";
+import axios from 'axios'
 import express from "express";
 import cors from "cors";
 import ejs from "ejs";
@@ -38,29 +39,30 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/css', express.static(path.join(__dirname, 'node_modules', 'bootstrap', 'dist', 'css')));
 
 // DB Init
-async function getData(){
-  await Ticker.deleteMany({});
-  const myData= await fetch("https://api.wazirx.com/api/v2/tickers");
-  const resp = await myData.json();
-  let arr = [];
-
-  for (let i in resp){
-      arr.push([i, resp[i]]);
-  }
-  for (let i=0; i< 10; i++){
-      const data= new Ticker({
-          name:arr[i][1]['name'],
-          last: arr[i][1]['last'],
-          buy: arr[i][1]['buy'],
-          sell: arr[i][1]['sell'],
-          volume: arr[i][1]['volume'],
-          base_unit: arr[i][1]['base_unit']
-      })
-      data.save();
+async function getData() {
+  try {
+    await Ticker.deleteMany({})
+    const response = await axios.get('https://api.wazirx.com/api/v2/tickers');
+    const tickers = response.data;
+    const top10 = Object.keys(tickers).slice(0, 10);
+    const data = top10.map(name => {
+      return {
+        name: tickers[name].name,
+        last: tickers[name].last,
+        buy: tickers[name].buy,
+        sell: tickers[name].sell,
+        volume: tickers[name].volume,
+        base_unit: tickers[name].base_unit
+      };
+    });
+    await Ticker.insertMany(data);
+  } catch (error) {
+    console.error(error);
   }
 }
-getData()
-setInterval(getData, 1000);
+
+getData();
+setInterval(getData, 4000);
 
 app.get("/", async (req, resp) => {
   let data = await Ticker.find();
